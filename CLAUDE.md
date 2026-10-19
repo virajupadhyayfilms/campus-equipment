@@ -1,17 +1,21 @@
 # Campus Equipment Lending — project notes for Claude Code
 
-DBMS mini-project (SY B.Tech IT). Flask + Psycopg 3 + PostgreSQL 18 (local, managed in pgAdmin 4). See README.md for full details.
+DBMS mini-project (SY B.Tech IT). Flask + Psycopg 3 + PostgreSQL. See README.md for full details.
+Two databases: local PostgreSQL 18 (`campus_equipment`, managed in pgAdmin 4, configured in `.env`)
+and the live site's Neon database (DATABASE_URL in `.env.vercel`). Live site: https://campus-equipment.vercel.app
+(deployed with the Vercel CLI, not from GitHub — pushing to GitHub does NOT redeploy). Never print or commit `.env*` files.
 
-## Current state (2026-10-19)
-- Database `campus_equipment` exists on localhost:5432 (user `postgres`).
-- `sql/schema.sql` and `sql/sample_data.sql` have ALREADY been run in pgAdmin. Tables, view, trigger and 3 sample loans exist.
-- DO NOT run `flask --app app init-db` — tables exist, it will stop with "relation already exists".
-- `sql/queries.sql` was run in pgAdmin; all queries succeed.
-- `.env` was created from `.env.example`. The user must put their real PGPASSWORD in it — never print or commit `.env`.
-- `.venv` has NOT been created yet; dependencies are not installed.
+## State (2026-10-19)
+- Local DB: schema + full `sql/sample_data.sql` (PART 1 and PART 2) loaded — 33 students, 16 equipment, 19 loans.
+- `sql/sample_data.sql` PART 2 adds 30 students, 10 equipment, 16 loans. PART 2 is idempotent (matched by
+  roll number / asset code / loan notes), so it is safe to run on a DB that already has PART 1.
+- Overview page now has a "Visual Summary" with three charts (equipment by category, loans by status,
+  loans by department), drawn in `static/app.js` `renderCharts()` from `/api/data` — no chart library.
 
-## Next step: get the website running
-1. Confirm `.env` has a real PGPASSWORD (check it's not the placeholder; don't echo the value).
-2. `python3 -m venv .venv && source .venv/bin/activate && python -m pip install -r requirements.txt`
-3. `python app.py` (serves http://127.0.0.1:5001; keep it running).
-4. Verify `curl -s http://127.0.0.1:5001/` and the API routes return data matching the DB (3 loans: 1 Returned, 1 Active, 1 Overdue).
+## Pending: update the LIVE site
+1. Load PART 2 into Neon (only that part — PART 1 is already there):
+   `sed -n '/^-- PART 2/,$p' sql/sample_data.sql > /tmp/part2.sql`, then run /tmp/part2.sql against
+   DATABASE_URL from `.env.vercel` (e.g. with the venv's psycopg, or psql). Verify counts: 33 / 16 / 19
+   only if Neon started with the same 3 sample loans; otherwise check that 30 students and 10 items were added.
+2. Redeploy: `vercel --prod`, then open https://campus-equipment.vercel.app and check the charts.
+3. Push the commit to GitHub: `git push`.

@@ -36,10 +36,33 @@ function render() {
   $('stats').innerHTML=[['Total Equipment',equipment.length,'Individual campus assets',''],['Available',available,'Ready to be issued','available'],['On Loan',open.length,'Awaiting a return',''],['Overdue',late,'Past the due date','overdue']].map(([label,note,sub,cl])=>`<div class="stat ${cl}"><div class="label">${label}</div><strong>${note}</strong><small>${sub}</small></div>`).join('');
   $('current-loans').innerHTML=table(['Equipment','Borrower','Issued','Due Date','Status','Return'],loanRows([...open].sort((a,b)=>a.due_date.localeCompare(b.due_date)).slice(0,5)));
   $('activity').innerHTML=events.slice(0,5).map(e=>{const l=loans.find(l=>l.loan_id===e.loan_id);return `<div class="event"><span class="event-dot"></span><div><strong>${escapeHTML(l?.equipment_name||'Equipment')} ${e.event_type==='Issued'?'issued to':'returned by'} ${escapeHTML(l?.student_name||'student')}</strong><small>Loan #${e.loan_id} · ${escapeHTML(new Date(e.recorded_at).toLocaleString('en-IN'))}</small></div></div>`;}).join('')||'<div class="empty">No activity yet.</div>';
-  renderEquipment();renderStudents();renderLoans();
+  renderCharts();renderEquipment();renderStudents();renderLoans();
   $('category-report').innerHTML=table(['Category','Total Items','On Loan','Maintenance','Available'],reports.map(r=>`<tr><td>${escapeHTML(r.category_name)}</td><td>${r.total_items}</td><td>${r.on_loan}</td><td>${r.maintenance_items}</td><td>${r.total_items-r.on_loan-r.maintenance_items}</td></tr>`));
   $('borrower-report').innerHTML=table(['Student','Roll Number','Total Loans','Open Loans'],state.borrower_report.map(s=>`<tr><td>${escapeHTML(s.student_name)}</td><td>${escapeHTML(s.roll_number)}</td><td>${s.total_loans}</td><td>${s.open_loans}</td></tr>`));
 }
+const STATUS_COLORS={'Available':'var(--available)','On Loan':'var(--onloan)','Maintenance':'var(--maint)','Active':'var(--onloan)','Overdue':'var(--overdue)','Returned':'var(--available)'};
+// rows: [{name, parts:[{label,value,color}]}] -> horizontal (stacked) bars sharing one scale.
+function barChart(rows,stack=false) {
+  const max=Math.max(1,...rows.map(r=>r.parts.reduce((t,p)=>t+p.value,0)));
+  if(!rows.length)return '<div class="empty">No data yet.</div>';
+  return rows.map(r=>{const total=r.parts.reduce((t,p)=>t+p.value,0);const parts=r.parts.filter(p=>p.value>0);
+    return `<div class="bar-row${stack?' stack':''}"><span class="name" title="${escapeHTML(r.name)}">${escapeHTML(r.name)}</span><span class="track"><span class="bar" style="width:calc((100% - 34px) * ${(total/max).toFixed(4)})">${parts.map(p=>`<span class="seg" style="flex:${p.value};background:${p.color}" data-tip="${escapeHTML(r.name)} · ${escapeHTML(p.label)}: ${p.value}"></span>`).join('')}</span><span class="value">${total}</span></span></div>`;}).join('');
+}
+function renderCharts() {
+  const {equipment,loans,students}=state;
+  const cats=['Available','On Loan','Maintenance'];
+  $('category-legend').innerHTML=cats.map(c=>`<span><i style="background:${STATUS_COLORS[c]}"></i>${c}</span>`).join('');
+  const byCat={};equipment.forEach(e=>{(byCat[e.category_name]??={Available:0,'On Loan':0,Maintenance:0})[e.status]++;});
+  $('category-chart').innerHTML=barChart(Object.entries(byCat).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,c])=>({name,parts:cats.map(k=>({label:k,value:c[k],color:STATUS_COLORS[k]}))})));
+  $('status-chart').innerHTML=barChart(['Active','Overdue','Returned'].map(k=>({name:k,parts:[{label:'Loans',value:loans.filter(l=>l.status===k).length,color:STATUS_COLORS[k]}]})));
+  const dept={};students.forEach(s=>dept[s.department]??=0);
+  const deptOf=Object.fromEntries(students.map(s=>[s.student_id,s.department]));
+  loans.forEach(l=>{const d=deptOf[l.student_id];if(d)dept[d]++;});
+  $('department-chart').innerHTML=barChart(Object.entries(dept).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(([name,v])=>({name,parts:[{label:'Loans',value:v,color:'var(--teal)'}]})),true);
+}
+document.addEventListener('mousemove',event=>{const tip=$('chart-tip');const t=event.target.closest?.('[data-tip]');
+  if(!t){tip.hidden=true;return;}tip.textContent=t.dataset.tip;tip.hidden=false;
+  const x=Math.min(event.clientX+12,window.innerWidth-tip.offsetWidth-8);tip.style.left=x+'px';tip.style.top=(event.clientY-36)+'px';});
 function renderEquipment() {
   const q=$('equipment-search').value.toLowerCase();const filter=$('equipment-filter').value;
   $('equipment-table').innerHTML=table(['Asset Code','Equipment','Category','Condition','Status','Actions'],state.equipment.filter(e=>(!filter||e.status===filter)&&`${e.asset_code} ${e.equipment_name} ${e.category_name}`.toLowerCase().includes(q)).map(e=>`<tr><td>${escapeHTML(e.asset_code)}</td><td><strong>${escapeHTML(e.equipment_name)}</strong></td><td>${escapeHTML(e.category_name)}</td><td>${escapeHTML(e.condition)}</td><td>${badge(e.status)}</td><td>${e.status==='On Loan'?'—':`<button class="small-button" data-condition="${e.equipment_id}">Condition</button><button class="small-button danger" data-delete-equipment="${e.equipment_id}">Delete</button>`}</td></tr>`));
