@@ -1,0 +1,12 @@
+.env
+.env*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+.vercel
+.agents/
+.claude/
+skills-lock.json
+.DS_Store
+*.zip
