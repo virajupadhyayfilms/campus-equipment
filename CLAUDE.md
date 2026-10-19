@@ -12,10 +12,12 @@ and the live site's Neon database (DATABASE_URL in `.env.vercel`). Live site: ht
 - Overview page now has a "Visual Summary" with three charts (equipment by category, loans by status,
   loans by department), drawn in `static/app.js` `renderCharts()` from `/api/data` — no chart library.
 
-## Pending: update the LIVE site
-1. Load PART 2 into Neon (only that part — PART 1 is already there):
-   `sed -n '/^-- PART 2/,$p' sql/sample_data.sql > /tmp/part2.sql`, then run /tmp/part2.sql against
-   DATABASE_URL from `.env.vercel` (e.g. with the venv's psycopg, or psql). Verify counts: 33 / 16 / 19
-   only if Neon started with the same 3 sample loans; otherwise check that 30 students and 10 items were added.
-2. Redeploy: `vercel --prod`, then open https://campus-equipment.vercel.app and check the charts.
-3. Push the commit to GitHub: `git push`.
+- Live site: UPDATED (2026-10-19). PART 2 loaded into Neon — 33 students, 16 equipment, 20 loans
+  (20, not 19, because one loan had already been issued through the live site before PART 2 was loaded).
+  Redeployed with `vercel deploy --prod`; Visual Summary charts verified at https://campus-equipment.vercel.app.
+  Commit pushed to GitHub (https://github.com/virajupadhyayfilms/campus-equipment).
+
+## Updating the live site later
+1. New sample data: run only the new SQL against DATABASE_URL_UNPOOLED from `.env.vercel` (venv's psycopg or psql).
+2. Code changes: `vercel deploy --prod` from this folder (never from `~`), then check the live URL.
+3. `git push` to keep GitHub in sync (it does not redeploy).
